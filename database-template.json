@@ -1,0 +1,203 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "nombres": "Juan Carlos",
+      "apellidos": "Chacón Barroso",
+      "correo": "juan@gmail.com",
+      "password": "123",
+      "telefono": "+52 2225839056",
+      "rol": "Mesero",
+      "estado": "Activo"
+    },
+    {
+      "id": 2,
+      "nombres": "Ana",
+      "apellidos": "Martínez",
+      "correo": "ana@gmail.com",
+      "password": "123",
+      "telefono": "+52 5551234567",
+      "rol": "Mesero",
+      "estado": "Inactivo"
+    },
+    {
+      "id": 3,
+      "nombres": "Gabriel",
+      "apellidos": "Huerta",
+      "correo": "admin@mesalink.com",
+      "password": "123456",
+      "telefono": "+52 5559876543",
+      "rol": "Admin",
+      "estado": "Activo"
+    },
+    {
+      "id": 4,
+      "nombres": "Chef",
+      "apellidos": "Principal",
+      "correo": "cocina@mesalink.com",
+      "password": "cocina123",
+      "telefono": "+52 5551112222",
+      "rol": "Cocina",
+      "estado": "Activo"
+    }
+  ],
+  "menu": [
+    {
+      "id": 1,
+      "nombre": "Agua de jamaica",
+      "categoria": "Bebidas",
+      "precio": 20,
+      "stock": 25,
+      "estado": "Disponible",
+      "desc": "Agua fresca de Jamaica natural."
+    },
+    {
+      "id": 2,
+      "nombre": "Frijoles de la olla",
+      "categoria": "Acompañamientos",
+      "precio": 38,
+      "stock": 0,
+      "estado": "Agotado",
+      "desc": "Frijoles de la olla calientitos."
+    },
+    {
+      "id": 3,
+      "nombre": "Milanesa de pollo",
+      "categoria": "Platos Fuertes",
+      "precio": 75,
+      "stock": 12,
+      "estado": "Disponible",
+      "desc": "Milanesa empanizada con guarnición."
+    },
+    {
+      "id": 4,
+      "nombre": "Ensalada de atún",
+      "categoria": "Platos Ligeros",
+      "precio": 65,
+      "stock": 8,
+      "estado": "Disponible",
+      "desc": "Ensalada fresca de atún con verduras."
+    },
+    {
+      "id": 5,
+      "nombre": "Sopa Azteca",
+      "categoria": "Platos Fuertes",
+      "precio": 55,
+      "stock": 10,
+      "estado": "Disponible",
+      "desc": "Sopa de tortilla tradicional."
+    },
+    {
+      "id": 6,
+      "nombre": "Refresco de Lata",
+      "categoria": "Bebidas",
+      "precio": 25,
+      "stock": 50,
+      "estado": "Disponible",
+      "desc": "Coca-Cola, Sprite, etc."
+    },
+    {
+      "nombre": "cocacola",
+      "categoria": "Bebidas",
+      "precio": 20,
+      "stock": 50,
+      "estado": "Disponible",
+      "desc": "refresco",
+      "id": 7
+    }
+  ],
+  "orders": [
+    {
+      "id": 1001,
+      "fecha": 1678886400000,
+      "cliente": "Familia Gómez",
+      "mesa": "Mesa M1",
+      "mesero": "Juan Carlos",
+      "items": [
+        {
+          "n": "Milanesa de pollo",
+          "c": 2,
+          "p": 75
+        },
+        {
+          "n": "Refresco de Lata",
+          "c": 3,
+          "p": 25
+        }
+      ],
+      "total": 225,
+      "estado": "Pagado"
+    },
+    {
+      "id": 1002,
+      "fecha": 1678890000000,
+      "cliente": "Carlos P.",
+      "mesa": "Mesa M2",
+      "mesero": "Juan Carlos",
+      "items": [
+        {
+          "n": "Sopa Azteca",
+          "c": 1,
+          "p": 55
+        }
+      ],
+      "total": 55,
+      "estado": "Cancelado"
+    }
+  ],
+  "activeOrders": {
+    "1": {
+      "mesero": "Juan Carlos",
+      "items": [
+        {
+          "id": 3,
+          "nombre": "Milanesa de pollo",
+          "c": 1,
+          "p": 75
+        },
+        {
+          "id": 1,
+          "nombre": "Agua de jamaica",
+          "c": 2,
+          "p": 20
+        }
+      ]
+    },
+    "2": {
+      "mesero": "Ana",
+      "items": [
+        {
+          "id": 5,
+          "nombre": "Sopa Azteca",
+          "c": 1,
+          "p": 55
+        }
+      ]
+    },
+    "3": {
+      "mesero": "Juan Carlos",
+      "items": [
+        {
+          "id": 4,
+          "nombre": "Ensalada de atún",
+          "c": 4,
+          "p": 65
+        },
+        {
+          "id": 6,
+          "nombre": "Refresco de Lata",
+          "c": 1,
+          "p": 25
+        }
+      ]
+    },
+    "4": {
+      "mesero": "Ana",
+      "items": []
+    },
+    "5": {
+      "mesero": "N/A",
+      "items": []
+    }
+  }
+}

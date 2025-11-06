@@ -1,0 +1,34 @@
+{
+  "name": "mesalink-mesero",
+  "version": "1.0.0",
+  "description": "Sistema de gestión para restaurante - Aplicación Mesero.",
+  "main": "server.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.mesalink.mesero",
+    "productName": "MesaLink Mesero",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "node_modules/**/*",
+      "!dist/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

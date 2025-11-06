@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MesaLink - Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <style>
+    :root{
+      --brand:#BF2E21; --brand-dark:#59130C; --bg:#F2EBDC; --accent:#F28A2E;
+      --ink:#2b2b2b; --card:#FFF7ED; --ok:#34A853; --warn:#FDD700; --bad:#EA4335;
+    }
+    html,body{height:100%; overflow:hidden;}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:0;display:flex;justify-content:center;}
+    .phone-container{width:100%;max-width:420px;height:100%;background:var(--card);box-shadow:0 0 20px rgba(0,0,0,.1);position:relative;display:flex;flex-direction:column;overflow:hidden;}
+    .top-header{background:var(--brand-dark);color:#fff;padding:1rem;display:flex;justify-content:space-between;align-items:center;border-bottom-left-radius:12px;border-bottom-right-radius:12px;z-index:10;flex-shrink:0}
+    .brand-wrap{display:flex;align-items:center;gap:.5rem}
+    .brand-wrap img.logo{width:28px;height:28px;border-radius:6px;object-fit:cover;background:#fff}
+    .bottom-nav{
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  background-color: var(--brand-dark);
+  border-top: 1px solid rgba(255,255,255,.1);
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  z-index: 50;
+}
+    .nav-item{display:flex;flex-direction:column;align-items:center;color:#f7f7f7;font-size:.75rem;padding:4px 8px;border-radius:8px;transition:background-color .2s;cursor:pointer;flex-grow:1;text-align:center}
+    .nav-item.active{color:var(--accent);background:rgba(255,255,255,.1)}
+    .nav-item:hover{background:rgba(255,255,255,.1)}
+    .content-area{flex-grow:1;padding:16px;overflow-y:auto}
+    .btn-primary{background:var(--brand);color:#fff;padding:10px 16px;border-radius:8px;font-weight:600;transition:background-color .2s}
+    .btn-primary:hover{background:var(--accent)}
+    .btn-danger{background:var(--bad);color:#fff;padding:10px 16px;border-radius:8px;font-weight:600;transition:background-color .2s}
+    .btn-danger:hover{background:#c53023}
+    .btn-ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:.5rem .75rem;font-weight:600}
+    .pill{padding:4px 8px;border-radius:9999px;font-size:.8rem;font-weight:600}
+    .pill.ok{background:#dff1e1;color:var(--ok)} .pill.warn{background:#fff2cf;color:#8a6a00} .pill.bad{background:#ffe6e6;color:var(--bad)}
+    #modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;justify-content:center;align-items:center;z-index:100}
+    .modal-content{background:var(--card);border-radius:16px;width:90%;max-width:400px;padding:24px;animation:fadeIn .3s ease-out;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  </style>
+</head>
+<body>
+  <div class="phone-container" id="app"></div>
+
+  <!-- Modal -->
+  <div id="modal-backdrop" onclick="closeModal(event)">
+    <div id="modal-content" class="modal-content"></div>
+  </div>
+
+  <!-- Nav inferior -->
+  <div id="bottom-nav" class="bottom-nav hidden">
+    <div class="nav-item active" data-view="home">
+      <i class="fas fa-home text-xl"></i><span>Home</span>
+    </div>
+    <div class="nav-item" data-view="orders">
+      <i class="fas fa-receipt text-xl"></i><span>Pedidos</span>
+    </div>
+    <div class="nav-item" data-view="menu">
+      <i class="fas fa-book-open text-xl"></i><span>Menú</span>
+    </div>
+    <div class="nav-item" data-view="history">
+      <i class="fas fa-history text-xl"></i><span>Historial</span>
+    </div>
+    <div class="nav-item" data-view="users">
+      <i class="fas fa-users text-xl"></i><span>Usuarios</span>
+    </div>
+  </div>
+
+  <script>
+    // --- Estado ---
+    let currentView = 'login';
+    // Persist selected category in Add Item view
+    window._selectedCategory = window._selectedCategory || null;
+    let currentUser = null;
+    let currentTableId = null;
+
+    // --- Datos desde JSON ---
+    let menuItems = [];
+    let orders = [];
+    let activeTableOrders = {};
+    let users = [];
+
+    // --- Funciones Fetch ---
+    async function fetchData(resource) {
+      try {
+        const response = await fetch(`/api/${resource}`);
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        return [];
+      }
+    }
+
+    async function saveData(resource, data) {
+      try {
+        const response = await fetch(`/api/${resource}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('Error saving data:', error);
+        return null;
+      }
+    }
+
+    async function updateData(resource, id, data) {
+      try {
+        const response = await fetch(`/api/${resource}/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('Error updating data:', error);
+        return null;
+      }
+    }
+
+    async function deleteData(resource, id) {
+      try {
+        const response = await fetch(`/api/${resource}/${id}`, {
+          method: 'DELETE'
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('Error deleting data:', error);
+        return null;
+      }
+    }
+
+    async function updateActiveOrders(data) {
+      try {
+        const response = await fetch('/api/activeOrders', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return await response.json();
+      } catch (error) {
+        console.error('Error updating active orders:', error);
+        return null;
+      }
+    }
+
+    // Cargar datos iniciales
+    async function loadInitialData() {
+      try {
+        menuItems = await fetchData('menu');
+        users = await fetchData('users');
+        orders = await fetchData('orders');
+        activeTableOrders = await fetchData('activeOrders');
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      }
+    }
+
+    // Utilidades
+    const $ = id => document.getElementById(id);
+    const nextId = list => Math.max(0, ...list.map(i=>i.id)) + 1;
+    const fmtMoney = a => `$${a.toFixed(2)}`;
+    const fmtDate = t => new Date(t).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).replace('.','');
+    function pill(estado){
+      let c = estado==='Disponible'||estado==='Activo'||estado==='Pagado'?'ok':estado==='Pendiente'?'warn':'bad';
+      return `<span class="pill ${c}">${estado}</span>`;
+    }
+
+    // Navegación
+    async function navigate(view, params=null){
+      currentView = view;
+      if(params?.tableId) currentTableId = params.tableId;
+      
+      // Recargar datos antes de renderizar
+      await loadInitialData();
+      renderApp();
+      
+      document.querySelectorAll('.nav-item').forEach(i=>{
+        i.classList.remove('active');
+        if(i.getAttribute('data-view')===view) i.classList.add('active');
+      });
+      document.querySelector('.content-area')?.scrollTo({top:0});
+    }
+
+    async function logout(){
+      currentUser = null;
+      currentView = 'login';
+      await loadInitialData();
+      renderApp();
+    }
+
+    // Render principal
+    async function renderApp(){
+      const app = $('app');
+      const nav = $('bottom-nav');
+      let html = '';
+      let title = 'MesaLink';
+
+      if(!currentUser){
+        nav.classList.add('hidden');
+        title = 'Iniciar Sesión';
+        html = getLoginView();
+      }else{
+        nav.classList.remove('hidden');
+
+        const header = `
+          <div class="top-header">
+            <div class="brand-wrap">
+              <img src="perrito-chef.png" alt="Logo" class="logo" />
+              <span class="text-xl font-bold">MesaLink</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="btn-ghost" title="Cerrar sesión" onclick="logout()">
+                <i class="fa fa-power-off mr-1"></i> Cerrar sesión
+              </button>
+              <div class="h-8 w-8 bg-white rounded-full flex items-center justify-center text-sm font-bold text-gray-800">
+                ${currentUser.nombres[0].toUpperCase()}
+              </div>
+            </div>
+          </div>
+          <div class="content-area">
+        `;
+        const footer = `</div>`;
+
+        switch(currentView){
+          case 'home':     html = header + await getHomeView() + footer; break;
+          case 'menu':     html = header + await getMenuView() + footer; break;
+          case 'history':  html = header + await getHistoryView() + footer; break;
+          case 'users':    html = header + await getUsersView() + footer; break;
+          case 'orders':   html = header + await getOrdersView() + footer; break;
+          case 'table-detail': html = header + await getTableDetailView(currentTableId) + footer; break;
+          case 'add-item': html = header + await getAddItemView(currentTableId) + footer; break;
+          case 'payment':  html = header + await getPaymentView(currentTableId) + footer; break;
+          default: navigate('home'); return;
+        }
+      }
+
+      app.innerHTML = html;
+      document.title = `MesaLink · ${title}`;
+
+      if(currentUser){
+        attachListeners();
+        // RBAC
+        const navUsers = document.querySelector('.nav-item[data-view="users"]');
+        const navMenu  = document.querySelector('.nav-item[data-view="menu"]');
+        const navHist  = document.querySelector('.nav-item[data-view="history"]');
+        if(currentUser.rol==='Mesero'){
+          if(navUsers) navUsers.style.display='none';
+          if(navMenu)  navMenu.style.display='none';
+          if(navHist)  navHist.style.display='none';
+          if(['users','menu','history'].includes(currentView)) setTimeout(()=>navigate('home'),0);
+        }else{
+          if(navUsers) navUsers.style.display='flex';
+          if(navMenu)  navMenu.style.display='flex';
+          if(navHist)  navHist.style.display='flex';
+        }
+      }else{
+        $('login-btn')?.addEventListener('click', handleLogin);
+      }
+    }
+
+    function attachListeners(){
+      document.querySelectorAll('.nav-item').forEach(i=>{
+        i.onclick = () => navigate(i.getAttribute('data-view'));
+      });
+      if(currentView==='menu'){
+        $('btnAddMenu')?.addEventListener('click', ()=>openModal('menu','add'));
+      }else if(currentView==='users'){
+        $('btnAddUser')?.addEventListener('click', ()=>openModal('users','add'));
+      }else if(currentView==='table-detail'){
+        $('btn-add-to-order')?.addEventListener('click', ()=>navigate('add-item',{tableId:currentTableId}));
+        $('btn-finish-order')?.addEventListener('click', ()=>navigate('payment',{tableId:currentTableId}));
+      }
+    }
+
+    // --- Vistas ---
+    function getLoginView(){
+      return `
+        <section class="content-area h-full flex flex-col justify-center items-center bg-local" style="background-color:var(--bg);padding-bottom:20px;box-sizing:border-box;">
+          <div class="text-center mb-8">
+            <img src="perrito-chef.png" alt="Logo" class="mx-auto mb-3" style="width:64px;height:64px;border-radius:12px;background:#fff;object-fit:cover" />
+            <div class="text-5xl font-extrabold" style="color:var(--brand);font-family:'Merriweather',serif;">MesaLink</div>
+            <h2 class="text-xl font-bold text-gray-800 mt-3">¡Bienvenido a MesaLink!</h2>
+            <p class="text-gray-600 mt-1">Donde servir rápido también sabe bien</p>
+          </div>
+
+          <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
+            <h1 class="text-2xl font-semibold text-center mb-6">Iniciar Sesión</h1>
+            <form id="login-form">
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+                <input type="text" id="user" value="juan@gmail.com" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder="Ej: admin@mesalink.com">
+              </div>
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                <input type="password" id="password" value="123" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder="*">
+              </div>
+              <button type="button" id="login-btn" class="w-full btn-primary">INGRESAR</button>
+            </form>
+          </div>
+
+          <div class="w-full max-w-sm mt-4 p-3 bg-white rounded-lg shadow-lg border-t-4" style="background-color:var(--card);border-color:var(--accent);">
+            <h3 class="text-md font-semibold mb-2" style="color:var(--brand-dark);">Usuarios de Prueba:</h3>
+            <ul class="text-sm space-y-1" style="color:var(--ink);">
+              <li><strong>Admin:</strong> admin@mesalink.com / 123456</li>
+              <li><strong>Mesero:</strong> juan@gmail.com / 123</li>
+            </ul>
+            <p class="text-xs mt-3 text-gray-600">
+              <strong>Admins:</strong> Ven todas las pestañas.<br>
+              <strong>Meseros:</strong> Solo ven Mesas y Pedidos.
+            </p>
+          </div>
+        </section>
+      `;
+    }
+
+    async function getHomeView(){
+      const mesas = [1,2,3,4]; // SOLO 4 MESAS
+      return `
+        <h1 class="text-2xl font-bold mb-4">Mesas</h1>
+        <div class="grid grid-cols-2 gap-4">
+          ${mesas.map(m=>{
+            const orders = activeTableOrders[m] || {items: []};
+            const num = orders.items ? orders.items.length : 0;
+            const status = num>0?'Ocupada':'Libre';
+            return `
+              <div class="bg-white p-4 rounded-xl shadow-md border-t-4 ${num>0?'border-[var(--brand)]':'border-[var(--ok)]'}">
+                <h2 class="text-xl font-semibold mb-1">MESA ${m}</h2>
+                <p class="text-sm text-gray-600">${num} ${num===1?'Pedido':'Pedidos'} activos</p>
+                <span class="text-xs font-bold ${num>0?'text-[var(--brand)]':'text-[var(--ok)]'} mt-1 block">${status}</span>
+                <button onclick="navigate('table-detail',{tableId:${m}})" class="w-full mt-3 bg-gray-100 text-sm text-[var(--brand)] font-semibold py-2 rounded-lg hover:bg-gray-200">Ver Detalle</button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    async function getOrdersView(){
+      // Combinar todos los items de todas las mesas
+      const allItems = [];
+      Object.keys(activeTableOrders).forEach(tableId => {
+        const table = activeTableOrders[tableId];
+        if(table && table.items && table.items.length > 0) {
+          table.items.forEach(item => {
+            allItems.push({
+              ...item,
+              mesa: tableId,
+              mesero: table.mesero
+            });
+          });
+        }
+      });
+      
+      return `
+        <h1 class="text-2xl font-bold mb-4">Pedidos Activos (Cocina)</h1>
+        <div class="space-y-4">
+          ${allItems.length ? allItems.map(o=>`
+            <div class="bg-white p-4 rounded-xl shadow-md border-l-4 border-yellow-400">
+              <div class="flex justify-between items-center mb-2">
+                <h2 class="text-lg font-semibold">${o.nombre} x${o.c}</h2>
+                ${pill('Pendiente')}
+              </div>
+              <p class="text-sm text-gray-600">Para: Mesa ${o.mesa} (${o.mesero})</p>
+              <div class="flex justify-end mt-2">
+                <button onclick="markItemAsReady(${o.mesa}, ${o.id})" class="bg-green-600 text-white text-xs font-semibold px-3 py-1 rounded-lg hover:opacity-90">Listo</button>
+              </div>
+            </div>
+          `).join('') : '<p class="text-gray-600 text-center mt-8">No hay pedidos activos.</p>'}
+        </div>
+      `;
+    }
+
+    async function getTableDetailView(tableId){
+      const table = activeTableOrders[tableId] || {items: []};
+      const items = table.items || [];
+      const total = items.reduce((s,i)=>s+(i.p*i.c),0);
+      return `
+        <h1 class="text-2xl font-bold mb-2">Mesa ${tableId}</h1>
+        <p class="text-gray-600 mb-4">Pedido #${String(tableId).padStart(3,'0')}</p>
+        <div class="space-y-3 mb-4">
+          ${items.length ? items.map((it,idx)=>`
+            <div class="bg-white p-3 rounded-xl shadow-md flex items-center">
+              <div class="flex-1">
+                <p class="font-semibold">${it.nombre} x${it.c}</p>
+                <p class="text-sm text-gray-600">${fmtMoney(it.p*it.c)}</p>
+              </div>
+              <button onclick="editItemFromTable(${tableId},${idx})" class="text-blue-500 font-semibold px-2 text-sm">Editar</button>
+              <button onclick="removeItemFromTable(${tableId},${idx})" class="text-red-500 font-semibold px-2 text-sm">Eliminar</button>
+            </div>
+          `).join('') : `<p class="text-gray-600 text-center py-6">No hay productos en esta mesa.</p>`}
+        </div>
+        <div class="border-t pt-4">
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-xl font-bold">Total:</span>
+            <span class="text-2xl font-extrabold" style="color:var(--brand);">${fmtMoney(total)}</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <button id="btn-add-to-order" class="btn-primary w-full text-center">+ Agregar Producto</button>
+            <button id="btn-finish-order" class="w-full text-center bg-green-600 text-white font-semibold py-2.5 rounded-lg hover:opacity-90">Terminar Pedido</button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function getAddItemView(tableId){
+      const categorias = [...new Set(menuItems.map(i=>i.categoria))];
+      const selected = window._selectedCategory && categorias.includes(window._selectedCategory)
+        ? window._selectedCategory
+        : categorias[0];
+      return `
+        <h1 class="text-2xl font-bold mb-4">Añadir a Mesa ${tableId}</h1>
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-1">1. Selecciona Categoría</label>
+          <select id="f-categoria-menu" class="w-full p-3 border rounded-lg" onchange="window._selectedCategory=this.value; renderApp()">
+            ${categorias.map(c=>`<option value="${c}" ${c===selected?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-1">2. Selecciona Producto</label>
+          <div id="product-list" class="space-y-2">
+            ${menuItems.filter(i=>i.estado==='Disponible' && i.categoria===( selected)).map(i=>`
+              <div class="bg-white p-3 rounded-xl shadow-md flex items-center">
+                <div class="flex-1">
+                  <p class="font-semibold">${i.nombre}</p>
+                  <p class="text-sm text-gray-600">${fmtMoney(i.precio)}</p>
+                </div>
+                <button onclick="addItemToTable(${tableId},${i.id})" class="h-10 w-10 bg-green-600 text-white text-xl font-bold rounded-full hover:opacity-90">+</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <button onclick="navigate('table-detail',{tableId:${tableId}})" class="w-full mt-6 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">Regresar al Pedido</button>
+      `;
+    }
+
+    async function getPaymentView(tableId){
+      const table = activeTableOrders[tableId] || {items: []};
+      const items = table.items || [];
+      const total = items.reduce((s,i)=>s+(i.p*i.c),0);
+      return `
+        <h1 class="text-2xl font-bold mb-4">Terminar Pedido (Mesa ${tableId})</h1>
+        <div class="bg-white p-4 rounded-xl shadow-md space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Método de pago</label>
+            <select id="f-payment-method" class="w-full p-3 border rounded-lg">
+              <option>Efectivo</option><option>Tarjeta</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Tipo de Tarjeta (Opcional)</label>
+            <select id="f-card-type" class="w-full p-3 border rounded-lg">
+              <option>N/A</option><option>Mastercard</option><option>Visa</option><option>Tarjeta de vales</option>
+            </select>
+          </div>
+          <div class="border-t pt-4">
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-xl font-bold">Total a pagar:</span>
+              <span class="text-2xl font-extrabold" style="color:var(--brand);">${fmtMoney(total)}</span>
+            </div>
+            <button onclick="finishOrder(${tableId})" class="w-full btn-danger">PAGAR Y CERRAR MESA</button>
+          </div>
+        </div>
+        <button onclick="navigate('table-detail',{tableId:${tableId}})" class="w-full mt-6 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">Regresar al Pedido</button>
+      `;
+    }
+
+    // Admin
+    async function getMenuView(){
+      const rows = () => menuItems.map(item=>`
+        <div class="bg-white p-4 rounded-xl shadow-md border-l-4 ${item.estado==='Disponible'?'border-green-500':'border-red-500'}">
+          <div class="flex justify-between items-start">
+            <div class="flex-1 min-w-0 pr-3">
+              <p class="text-lg font-bold truncate">${item.nombre}</p>
+              <p class="text-sm text-gray-600">${item.categoria} · ${fmtMoney(item.precio)}</p>
+              <p class="text-xs text-gray-500 mt-1">Stock: <span class="font-semibold">${item.stock}</span></p>
+            </div>
+            <div class="text-right">${pill(item.estado)}</div>
+          </div>
+          <div class="flex justify-end space-x-2 mt-3 text-sm">
+            <button onclick="openModal('menu','edit',${item.id})" class="text-blue-500 hover:text-blue-700 font-semibold">Editar</button>
+            <button onclick="toggleItemStatus(${item.id})" class="text-yellow-600 hover:text-yellow-800 font-semibold">${item.estado==='Disponible'?'Ocultar':'Mostrar'}</button>
+            <button onclick="deleteItem(${item.id})" class="text-red-500 hover:text-red-700 font-semibold">Eliminar</button>
+          </div>
+        </div>
+      `).join('');
+      return `
+        <h1 class="text-2xl font-bold mb-4">Inventario del Menú</h1>
+        <div class="mb-4 flex gap-2">
+          <input type="text" placeholder="Buscar platillo..." class="flex-1 p-2 border border-gray-300 rounded-lg">
+          <button id="btnAddMenu" class="btn-primary">+ Agregar producto</button>
+        </div>
+        <div class="space-y-3">${rows()}</div>
+      `;
+    }
+
+    async function getHistoryView(){
+      const totalPaid = orders.filter(o=>o.estado==='Pagado').reduce((s,o)=>s+o.total,0);
+      const totalCount = orders.length;
+      const paidCount = orders.filter(o=>o.estado==='Pagado').length;
+      const rows = () => orders.map(p=>`
+        <div class="bg-white p-4 rounded-xl shadow-md mb-3 border-l-4 ${p.estado==='Pagado'?'border-green-500':p.estado==='Cancelado'?'border-red-500':'border-yellow-400'}">
+          <div class="text-sm text-gray-600 flex justify-between">
+            <span class="font-mono">#${p.id}</span><span>${fmtDate(p.fecha)}</span>
+          </div>
+          <p class="text-lg font-semibold mt-1">${p.cliente} · ${p.mesa}</p>
+          <p class="text-sm text-gray-700 mt-1">${p.items.map(i=>`${i.c}x ${i.n}`).join(', ')}</p>
+          <div class="flex justify-between items-center mt-3">
+            <span class="text-xl font-bold" style="color:var(--brand);">${fmtMoney(p.total)}</span>
+            <div class="flex items-center gap-2">
+              ${pill(p.estado)}
+              <button onclick="openModal('history','view',${p.id})" class="text-[var(--brand)] hover:text-[var(--accent)] font-semibold text-sm">Ver detalle</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+      return `
+        <h1 class="text-2xl font-bold mb-4">Historial de Pedidos</h1>
+        <div class="bg-white p-4 rounded-xl shadow-md mb-4 text-sm">
+          Mostrando ${totalCount} pedidos — Total acumulado: <span class="font-bold">${fmtMoney(totalPaid)}</span> — Pagados: <span class="font-bold">${paidCount}</span>
+        </div>
+        <div class="space-y-3">${rows()}</div>
+        <button onclick="alert('Exportando a CSV...')" class="w-full mt-6 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300">Exportar a CSV</button>
+      `;
+    }
+
+    async function getUsersView(){
+      const rows = () => users.map(u=>`
+        <div class="bg-white p-4 rounded-xl shadow-md mb-3 border-l-4 ${u.estado==='Activo'?'border-green-500':'border-red-500'}">
+          <div class="flex justify-between items-start">
+            <div class="flex-1 min-w-0 pr-3">
+              <p class="text-lg font-bold truncate">${u.nombres} ${u.apellidos}</p>
+              <p class="text-sm text-gray-600">${u.rol} · ${u.correo}</p>
+              <p class="text-xs text-gray-500 mt-1">${u.telefono}</p>
+            </div>
+            <div class="text-right">${pill(u.estado)}</div>
+          </div>
+          <div class="flex justify-end gap-2 mt-3 text-sm">
+            <button onclick="openModal('users','edit',${u.id})" class="text-blue-500 hover:text-blue-700 font-semibold">Editar</button>
+            <button onclick="deleteUser(${u.id})" class="text-red-500 hover:text-red-700 font-semibold">Eliminar</button>
+          </div>
+        </div>
+      `).join('');
+      return `
+        <h1 class="text-2xl font-bold mb-4">Usuarios - Agregar meseros</h1>
+        <button id="btnAddUser" class="btn-primary w-full mb-4">+ Agregar Mesero</button>
+        <div class="space-y-3">${rows()}</div>
+      `;
+    }
+
+    // Login
+    async function handleLogin(){
+      const userEmail = $('user').value.trim();
+      const pass = $('password').value.trim();
+      
+      // Cargar usuarios desde JSON
+      users = await fetchData('users');
+      const found = users.find(u=>u.correo===userEmail && u.password===pass && u.estado==='Activo');
+      
+      if(found){ 
+        currentUser = found; 
+        await loadInitialData();
+        navigate('home'); 
+      }
+      else showErrorMessage('Usuario, contraseña incorrectos o usuario inactivo.');
+    }
+    
+    function showErrorMessage(msg){
+      let box = $('login-error');
+      if(!box){
+        box = document.createElement('div');
+        box.id='login-error';
+        box.className='bg-red-100 text-red-700 p-3 rounded-lg text-sm mb-4';
+        $('login-form').prepend(box);
+      }
+      box.textContent = msg;
+    }
+
+    // Mesero - Funciones para manejar pedidos
+    async function addItemToTable(tableId, itemId){
+      const prod = menuItems.find(i=>i.id===itemId); 
+      if(!prod) return;
+      
+      const table = activeTableOrders[tableId] || {mesero: currentUser.nombres + ' ' + currentUser.apellidos, items: []};
+      const existingItem = table.items.find(i=>i.id===itemId);
+      
+      if(existingItem) {
+        existingItem.c += 1;
+      } else {
+        table.items.push({
+          id: prod.id,
+          nombre: prod.nombre,
+          p: prod.precio,
+          c: 1
+        });
+      }
+      
+      // Actualizar en JSON
+      activeTableOrders[tableId] = table;
+      await updateActiveOrders(activeTableOrders);
+      
+      alert(`${prod.nombre} añadido a la Mesa ${tableId}.`);
+      navigate('table-detail',{tableId});
+    }
+
+    async function editItemFromTable(tableId, idx){
+      const table = activeTableOrders[tableId]; 
+      const it = table.items[idx]; 
+      if(!it) return;
+      
+      const nv = parseInt(prompt(`Editar cantidad para '${it.nombre}':`, it.c),10);
+      if(!isNaN(nv) && nv>0){ 
+        it.c = nv; 
+      } else if(nv===0){ 
+        await removeItemFromTable(tableId,idx); 
+        return; 
+      }
+      
+      // Actualizar en JSON
+      await updateActiveOrders(activeTableOrders);
+      await renderApp();
+    }
+
+    async function removeItemFromTable(tableId, idx){
+      const table = activeTableOrders[tableId]; 
+      const it = table.items[idx]; 
+      if(!it) return;
+      
+      if(confirm(`¿Eliminar '${it.nombre} x${it.c}' del pedido?`)){ 
+        table.items.splice(idx,1);
+        // Actualizar en JSON
+        await updateActiveOrders(activeTableOrders);
+        await renderApp(); 
+      }
+    }
+
+    async function finishOrder(tableId){
+      const table = activeTableOrders[tableId]; 
+      if(!table || !table.items.length){ 
+        alert("No se puede cerrar una mesa vacía."); 
+        return; 
+      }
+      
+      const total = table.items.reduce((s,i)=>s+(i.p*i.c),0);
+      const newOrder = { 
+        id: nextId(orders), 
+        fecha: Date.now(), 
+        cliente: `Mesa ${tableId} (Cliente)`, 
+        mesa: `Mesa M${tableId}`, 
+        mesero: `${currentUser.nombres} ${currentUser.apellidos}`, 
+        items: table.items.map(i=>({c:i.c, n:i.nombre, p:i.p})), 
+        total, 
+        estado: "Pagado" 
+      };
+      
+      // Guardar en historial
+      await saveData('orders', newOrder);
+      
+      // Limpiar mesa
+      table.items = [];
+      await updateActiveOrders(activeTableOrders);
+      
+      alert(`¡Pedido de Mesa ${tableId} por ${fmtMoney(total)} pagado y cerrado!\nEnviado al historial.`);
+      navigate('home');
+    }
+
+    async function markItemAsReady(tableId, itemId) {
+      const table = activeTableOrders[tableId];
+      if (table && table.items) {
+        // Remover el item específico de la mesa
+        table.items = table.items.filter(item => item.id !== itemId);
+        await updateActiveOrders(activeTableOrders);
+        alert('¡Pedido marcado como listo!');
+        await navigate('orders');
+      }
+    }
+
+    // Inventario
+    async function toggleItemStatus(id){ 
+      const it = menuItems.find(d=>d.id===id); 
+      if(!it) return; 
+      it.estado = it.estado==="Disponible"?"Agotado":"Disponible"; 
+      await updateData('menu', id, {estado: it.estado});
+      await renderApp(); 
+    }
+    
+    async function deleteItem(id){ 
+      if(!confirm("¿Eliminar producto?")) return; 
+      await deleteData('menu', id);
+      menuItems = menuItems.filter(d=>d.id!==id); 
+      await renderApp(); 
+    }
+
+    // Usuarios
+    async function deleteUser(id){ 
+      if(!confirm("¿Eliminar usuario?")) return; 
+      await deleteData('users', id);
+      users = users.filter(u=>u.id!==id); 
+      await renderApp(); 
+    }
+
+    // Modal genérico
+    let modalContext = {}; 
+    let editingId = null;
+    
+    function openModal(view,mode,id=null){
+      editingId = id; 
+      modalContext = {view,mode,id};
+      const el = $('modal-content'); 
+      let content=''; 
+      let title='';
+      
+      if(view==='history' && mode==='view'){
+        const p = orders.find(x=>x.id===id); 
+        if(!p) return;
+        title = `Detalle Pedido #${p.id}`;
+        content = `
+          <p class="text-sm mb-3">${p.cliente} - ${p.mesa} · Mesero: ${p.mesero}</p>
+          <ul class="list-disc pl-5 space-y-1 text-gray-700 text-sm">
+            ${p.items.map(i=>`<li>${i.c} × ${i.n} — <span class="font-bold">${fmtMoney(i.p)} (c/u)</span></li>`).join("")}
+          </ul>
+          <div class="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center">
+            <span class="text-lg font-bold">Total:</span>
+            <span class="text-xl font-extrabold" style="color:var(--brand);">${fmtMoney(p.total)}</span>
+          </div>
+        `;
+      } else if(view==='menu'){
+        const item = id ? menuItems.find(d=>d.id===id) : {};
+        title = mode==='add'?'Agregar Producto':'Editar Producto';
+        content = getProductForm(item);
+      } else if(view==='users'){
+        const user = id ? users.find(d=>d.id===id) : {};
+        title = mode==='add'?'Agregar Mesero':'Editar Mesero';
+        content = getUserForm(user);
+      }
+      
+      el.innerHTML = `
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+          <h3 class="text-xl font-bold">${title}</h3>
+          <button onclick="closeModal(event)" class="text-gray-500 hover:text-gray-800 text-2xl font-light">&times;</button>
+        </div>
+        <form id="modal-form">${content}</form>
+        ${(view!=='history')?`
+          <div class="flex justify-end gap-2 mt-4">
+            <button type="button" onclick="closeModal(event)" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-gray-400">Cancelar</button>
+            <button type="button" onclick="handleSave()" class="btn-primary px-4 py-2">Guardar ${view==='menu'?'Producto':'Usuario'}</button>
+          </div>`:''}
+      `;
+      $('modal-backdrop').style.display='flex';
+    }
+    
+    function closeModal(e){
+      if(e && e.target.id!=='modal-backdrop' && !e.target.classList.contains('text-2xl')) return;
+      $('modal-backdrop').style.display='none';
+    }
+
+    function getProductForm(item={}){
+      return `
+        <input type="hidden" id="f-id" value="${item.id||''}">
+        <div class="mb-3"><label class="block text-sm font-medium mb-1">Nombre</label><input id="f-nombre" value="${item.nombre||''}" class="w-full p-2 border rounded-lg"/></div>
+        <div class="mb-3"><label class="block text-sm font-medium mb-1">Descripción</label><textarea id="f-desc" class="w-full p-2 border rounded-lg">${item.desc||''}</textarea></div>
+        <div class="flex gap-3 mb-3">
+          <div class="flex-1"><label class="block text-sm font-medium mb-1">Precio</label><input type="number" step="0.01" id="f-precio" value="${item.precio||''}" class="w-full p-2 border rounded-lg"></div>
+          <div class="flex-1"><label class="block text-sm font-medium mb-1">Stock</label><input type="number" id="f-stock" value="${item.stock||0}" class="w-full p-2 border rounded-lg"></div>
+        </div>
+        <div class="flex gap-3 mb-3">
+          <div class="flex-1">
+            <label class="block text-sm font-medium mb-1">Categoría</label>
+            <select id="f-categoria" class="w-full p-2 border rounded-lg">
+              <option ${item.categoria==='Bebidas'?'selected':''}>Bebidas</option>
+              <option ${item.categoria==='Platos Fuertes'?'selected':''}>Platos Fuertes</option>
+              <option ${item.categoria==='Acompañamientos'?'selected':''}>Acompañamientos</option>
+              <option ${item.categoria==='Postres'?'selected':''}>Postres</option>
+              <option ${item.categoria==='Platos Ligeros'?'selected':''}>Platos Ligeros</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="block text-sm font-medium mb-1">Estado</label>
+            <select id="f-estado" class="w-full p-2 border rounded-lg">
+              <option ${item.estado==='Disponible'?'selected':''}>Disponible</option>
+              <option ${item.estado==='Agotado'?'selected':''}>Agotado</option>
+            </select>
+          </div>
+        </div>
+      `;
+    }
+
+    function getUserForm(user={}){
+      const telPart = (user.telefono||'').split(' ');
+      const lada = telPart[0] || '+52';
+      const tel = telPart.length>1 ? telPart.slice(1).join(' ') : '';
+      return `
+        <input type="hidden" id="f-user-id" value="${user.id||''}">
+        <div class="mb-3"><label class="block text-sm font-medium mb-1">Nombres</label><input id="f-nombres" value="${user.nombres||''}" class="w-full p-2 border rounded-lg"></div>
+        <div class="mb-3"><label class="block text-sm font-medium mb-1">Apellidos</label><input id="f-apellidos" value="${user.apellidos||''}" class="w-full p-2 border rounded-lg"></div>
+        <div class="mb-3"><label class="block text-sm font-medium mb-1">Correo</label><input type="email" id="f-correo" value="${user.correo||''}" class="w-full p-2 border rounded-lg"></div>
+        <div class="mb-3"><label class="block text-sm font-medium mb-1">Contraseña</label><input type="password" id="f-password" placeholder="${user.id?'Dejar en blanco para no cambiar':'*'}" class="w-full p-2 border rounded-lg"></div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium mb-1">Número de teléfono</label>
+          <div class="flex gap-2">
+            <select id="f-lada" class="p-2 border rounded-lg w-1/4">
+              <option value="+52" ${lada==='+52'?'selected':''}>+52</option>
+              <option value="+1" ${lada==='+1'?'selected':''}>+1</option>
+            </select>
+            <input id="f-telefono" value="${tel}" class="w-3/4 p-2 border rounded-lg" placeholder="2225839056">
+          </div>
+        </div>
+        <div class="flex gap-3 mb-3">
+          <div class="flex-1">
+            <label class="block text-sm font-medium mb-1">Rol</label>
+            <select id="f-rol" class="w-full p-2 border rounded-lg">
+              <option ${user.rol==='Mesero'?'selected':''}>Mesero</option>
+              <option ${user.rol==='Admin'?'selected':''}>Admin</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="block text-sm font-medium mb-1">Estado</label>
+            <select id="f-user-estado" class="w-full p-2 border rounded-lg">
+              <option ${user.estado==='Activo'?'selected':''}>Activo</option>
+              <option ${user.estado==='Inactivo'?'selected':''}>Inactivo</option>
+            </select>
+          </div>
+        </div>
+      `;
+    }
+
+    async function handleSave(){
+      if(modalContext.view==='menu') await saveProduct();
+      else if(modalContext.view==='users') await saveUser();
+    }
+    
+    async function saveProduct(){
+      const nombre = $('f-nombre').value.trim();
+      const desc = $('f-desc').value.trim();
+      const precio = parseFloat($('f-precio').value);
+      const stock = parseInt($('f-stock').value,10);
+      const categoria = $('f-categoria').value;
+      const estado = $('f-estado').value;
+      
+      if(!nombre || !desc || isNaN(precio) || precio<=0 || isNaN(stock)){
+        alert('Completa todos los campos correctamente.');
+        return;
+      }
+      
+      const newItem = { nombre, desc, precio, stock, categoria, estado };
+      if(modalContext.mode==='add'){
+        const savedItem = await saveData('menu', newItem);
+        if(savedItem){
+          menuItems.push(savedItem);
+        }
+        alert('Producto agregado.');
+      }else{
+        await updateData('menu', modalContext.id, newItem);
+        const i = menuItems.findIndex(x=>x.id===modalContext.id);
+        if(i!==-1) menuItems[i] = { ...menuItems[i], ...newItem };
+        alert('Producto actualizado.');
+      }
+      
+      $('modal-backdrop').style.display='none'; 
+      await renderApp();
+    }
+    
+    async function saveUser(){
+      const id = modalContext.id;
+      const nombres = $('f-nombres').value.trim();
+      const apellidos = $('f-apellidos').value.trim();
+      const correo = $('f-correo').value.trim();
+      const password = $('f-password').value.trim();
+      const lada = $('f-lada').value;
+      const telefono = $('f-telefono').value.trim();
+      const rol = $('f-rol').value;
+      const estado = $('f-user-estado').value;
+      const fullTelefono = `${lada} ${telefono}`;
+      
+      if(!nombres || !apellidos || !correo || !telefono || (modalContext.mode==='add' && !password)){
+        alert('Completa los campos obligatorios.');
+        return;
+      }
+      
+      const newUser = { nombres, apellidos, correo, telefono:fullTelefono, rol, estado };
+      if(modalContext.mode==='add'){
+        const savedUser = await saveData('users', { ...newUser, password });
+        if(savedUser){
+          users.push(savedUser);
+        }
+        alert('Usuario mesero agregado.');
+      }else{
+        const updatedUser = { ...newUser };
+        if(password){
+          updatedUser.password = password;
+        }
+        await updateData('users', id, updatedUser);
+        const i = users.findIndex(u=>u.id===id);
+        if(i!==-1) users[i] = { ...users[i], ...updatedUser };
+        alert('Usuario actualizado.');
+      }
+      
+      $('modal-backdrop').style.display='none'; 
+      await renderApp();
+    }
+
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadInitialData();
+      renderApp();
+    });
+  </script>
+</body>
+</html>
